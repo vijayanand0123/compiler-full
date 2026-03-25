@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prime Compiler — All Phases + Execution</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --bg:#f0f2f2;
+  --card:#ffffff;
+  --border:#d5d9d9;
+  --accent:#ff9900;
+  --accent2:#f5a623;
+  --text:#0f1111;
+  --muted:#4b5563;
+  --green:#007600;
+  --red:#d13212;
+  --yellow:#fcd200;
+  --purple:#5f5b8c;
+  --pink:#e47911;
+  --orange:#ffb84d;
+  --indigo:#37475a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:"Ember",Arial,system-ui,sans-serif;
+  background:radial-gradient(circle at 10% 10%,rgba(255,153,0,.08),transparent 30%),
+             radial-gradient(circle at 90% 5%,rgba(54,82,98,.08),transparent 30%),
+             var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  padding:24px 16px 40px;
+}
+.page{max-width:1380px;margin:0 auto;}
+header{text-align:center;margin-bottom:20px;}
+.pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:7px 16px;border-radius:999px;
+  background:linear-gradient(90deg,#232f3e,#37475a);
+  color:#ffedcc;font-weight:700;font-size:13px;
+  border:1px solid #232f3e;box-shadow:0 3px 10px rgba(0,0,0,.15);
+}
+h1{font-size:26px;letter-spacing:-.4px;margin:10px 0 4px;color:#131921;}
+.sub{color:var(--muted);font-size:13px;max-width:720px;margin:0 auto;}
+.grid{display:grid;grid-template-columns:1fr;gap:16px;}
+@media(min-width:960px){.grid{grid-template-columns:1.05fr .95fr;}}
+.card{
+  background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,255,255,.95)),var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:0 10px 32px rgba(17,24,39,.12);
+  padding:18px;
+}
+.card-title{
+  font-size:12px;font-weight:800;color:#232f3e;
+  letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;
+}
+textarea{
+  width:100%;min-height:260px;padding:12px;border-radius:10px;
+  border:1px solid var(--border);
+  background:#ffffff;
+  color:#111827;
+  font-family:"JetBrains Mono","Fira Code",monospace;
+  font-size:12.5px;resize:vertical;outline:none;tab-size:4;
+}
+textarea:focus{box-shadow:0 0 0 3px rgba(255,153,0,.25);border-color:#ff9900;}
+.controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+.btn{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#131921;border:none;border-radius:10px;
+  padding:9px 16px;font-weight:800;cursor:pointer;
+  box-shadow:0 6px 18px rgba(255,153,0,.35);font-size:12.5px;transition:.15s;
+}
+.btn:hover{filter:brightness(1.07);}
+.btn-sec{
+  background:rgba(255,153,0,.12);border:1px solid rgba(255,153,0,.35);
+  color:#c45500;border-radius:10px;padding:9px 12px;cursor:pointer;
+  font-weight:700;font-size:12.5px;
+}
+.btn-clear{
+  background:transparent;border:1px solid var(--border);
+  color:var(--muted);border-radius:10px;padding:9px 12px;
+  cursor:pointer;font-size:12.5px;
+}
+.status{color:var(--muted);font-size:12px;flex:1;min-width:100px;}
+.pbar{display:flex;gap:0;margin-bottom:12px;flex-wrap:wrap;}
+.pbtn{
+  padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer;
+  border:1px solid var(--border);background:#f8f9fa;color:var(--muted);
+  transition:.15s;white-space:nowrap;
+}
+.pbtn:first-child{border-radius:8px 0 0 8px;}
+.pbtn:last-child{border-radius:0 8px 8px 0;}
+.pbtn.active{
+  background:linear-gradient(135deg,#ffb84d,#ff9900);
+  color:#131921;border-color:#ff9900;box-shadow:0 4px 10px rgba(255,153,0,.3);
+}
+.pnum{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;border-radius:50%;
+  background:rgba(0,0,0,.06);font-size:9px;font-weight:800;margin-right:3px;
+}
+.pbtn.active .pnum{background:rgba(0,0,0,.15);}
+.sbadges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.badge{padding:4px 8px;border-radius:999px;font-weight:700;font-size:11px;}
+.badge.KEYWORD{color:var(--yellow);background:rgba(252,210,0,.12);}
+.badge.IDENTIFIER{color:var(--accent);background:rgba(255,153,0,.12);}
+.badge.INTEGER,.badge.FLOAT{color:var(--green);background:rgba(0,118,0,.08);}
+.badge.STRING{color:var(--orange);background:rgba(255,184,77,.12);}
+.badge.OPERATOR{color:var(--indigo);background:rgba(55,71,90,.12);}
+.badge.DELIMITER{color:var(--pink);background:rgba(228,121,17,.12);}
+.badge.COMMENT{color:var(--muted);background:rgba(75,85,99,.12);}
+.badge.PREPROCESSOR{color:var(--purple);background:rgba(95,91,140,.12);}
+.tw{max-height:480px;overflow:auto;border-radius:8px;border:1px solid var(--border);background:#f8fafb;}
+table{width:100%;border-collapse:collapse;}
+thead{position:sticky;top:0;background:#232f3e;z-index:1;}
+th,td{padding:7px 10px;font-size:12px;text-align:left;border-bottom:1px solid var(--border);}
+th{color:#f9fafb;text-transform:uppercase;font-weight:800;letter-spacing:.5px;font-size:11px;}
+td.val{font-family:"JetBrains Mono",monospace;color:#111827;}
+.empty{text-align:center;color:var(--muted);padding:36px 12px;font-size:13px;}
+.cw{max-height:520px;overflow:auto;border-radius:8px;border:1px solid var(--border);background:#f8fafb;padding:0;}
+.cl{display:flex;font-family:"JetBrains Mono",monospace;font-size:12px;line-height:1.7;border-bottom:1px solid #e3e6e6;}
+.cn{min-width:40px;text-align:right;padding:2px 8px 2px 4px;color:#6b7280;background:#e3e6e6;user-select:none;}
+.cc{padding:2px 10px;white-space:pre;}
+.ast-wrap{max-height:480px;overflow:auto;border-radius:8px;border:1px solid var(--border);background:#f8fafb;padding:14px;font-family:"JetBrains Mono",monospace;font-size:11.5px;}
+.ast-node{line-height:1.65;white-space:nowrap;}
+.ast-type{color:var(--accent);font-weight:700;}
+.ast-value{color:var(--yellow);}
+.ast-loc{color:#6b7280;font-size:10px;}
+.ast-toggle{cursor:pointer;user-select:none;}
+#parse-c .ast-node{line-height:1.6;}
+#parse-c .ast-children{margin-left:18px;border-left:1px dashed var(--border);padding-left:12px;}
+.opt-item{font-size:12px;font-family:"JetBrains Mono",monospace;margin-bottom:6px;padding:8px 12px;border-radius:8px;border-left:3px solid;}
+.opt-fold{color:var(--green);background:rgba(0,118,0,.08);border-color:var(--green);}
+.opt-prop{color:var(--accent);background:rgba(255,153,0,.1);border-color:var(--accent);}
+.opt-dead{color:var(--red);background:rgba(209,50,18,.1);border-color:var(--red);}
+.opt-strength{color:var(--yellow);background:rgba(252,210,0,.12);border-color:var(--yellow);}
+.opt-algebraic{color:var(--purple);background:rgba(95,91,140,.1);border-color:var(--purple);}
+.opt-subexpr{color:var(--orange);background:rgba(255,184,77,.12);border-color:var(--orange);}
+.diff-before{background:rgba(209,50,18,.08);border:1px solid rgba(209,50,18,.18);border-radius:6px;padding:8px;margin-bottom:4px;}
+.diff-after{background:rgba(0,118,0,.08);border:1px solid rgba(0,118,0,.18);border-radius:6px;padding:8px;}
+.diff-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.diff-label.before{color:var(--red);}
+.diff-label.after{color:var(--green);}
+.diff-code{font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:pre-wrap;color:var(--text);}
+.parse-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px;}
+.stat-card{background:rgba(255,153,0,.1);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.stat-value{font-size:20px;font-weight:800;color:#c45500;}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.hidden{display:none !important;}
+.console-wrap{
+  border-radius:8px;border:1px solid #131921;
+  background:#131921;padding:16px;min-height:200px;max-height:520px;overflow:auto;
+  font-family:"JetBrains Mono",monospace;font-size:13px;
+}
+.console-line{line-height:1.8;color:#b7e4c7;}
+.console-line.error{color:#ffc1c1;}
+.console-line.info{color:#d5d9d9;}
+.console-line.warn{color:#fcd200;}
+.console-line.output{color:#ffffff;}
+.console-prompt{color:#ffb84d;user-select:none;}
+.console-retval{color:#c8a2ff;}
+footer{
+  margin-top:16px;padding-top:12px;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+  color:var(--muted);font-size:13px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  <div class="pill">🛒 Prime Compiler</div>
+  <h1>Prime Compiler — All Phases + Execution</h1>
+  <p class="sub">Lexer → Parser → Semantic → ICG → Optimizer → Code Gen → <strong>Execution with Output</strong>. All in the browser.</p>
+</header>
+<div class="grid">
+  <div class="card">
+    <div class="card-title">Source Code</div>
+    <textarea id="code" spellcheck="false">#include <stdio.h>
+
+/* demo program */
+int factorial(int n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+int main() {
+    int x = 2 + 3;
+    int y = x * 2;
+    float pi = 3.14;
+    int z = x * 1;
+    int w = y + 0;
+
+    printf("=== Compiler Output Demo ===");
+    printf("x = %d", x);
+    printf("y = %d", y);
+    printf("pi = %f", pi);
+    printf("z (x*1) = %d", z);
+    printf("w (y+0) = %d", w);
+
+    int fact5 = factorial(5);
+    printf("factorial(5) = %d", fact5);
+
+    if (x >= 5) {
+        printf("x is >= 5");
+    } else {
+        printf("x is < 5");
+    }
+
+    int sum = 0;
+    for (int i = 1; i <= 5; i++) {
+        sum = sum + i;
+    }
+    printf("sum(1..5) = %d", sum);
+
+    int count = 3;
+    while (count > 0) {
+        printf("countdown: %d", count);
+        count--;
+    }
+    printf("Liftoff!");
+
+    return 0;
+}</textarea>
+    <div class="controls">
+      <button class="btn" id="run">⚡ Compile &amp; Run</button>
+      <button class="btn-sec" id="demo-c">Demo C</button>
+      <button class="btn-sec" id="demo-py">Demo Python</button>
+      <button class="btn-clear" id="clear">Clear</button>
+      <span class="status" id="status">Ready</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="pbar">
+      <button class="pbtn active" data-tab="out"><span class="pnum">▶</span>Output</button>
+      <button class="pbtn" data-tab="p1"><span class="pnum">1</span>Lexer</button>
+      <button class="pbtn" data-tab="p2"><span class="pnum">2</span>Syntax</button>
+      <button class="pbtn" data-tab="p3"><span class="pnum">3</span>Semantic</button>
+      <button class="pbtn" data-tab="p4"><span class="pnum">4</span>ICG</button>
+      <button class="pbtn" data-tab="p5"><span class="pnum">5</span>Optimize</button>
+      <button class="pbtn" data-tab="p6"><span class="pnum">6</span>ASM</button>
+      <button class="pbtn" data-tab="p7"><span class="pnum">7</span>Summary</button>
+    </div>
+    <div id="panel-out"><div class="console-wrap" id="console"><div class="console-line info">Click <b>Compile &amp; Run</b> to execute your code.</div></div></div>
+    <div id="panel-p1" class="hidden"><div class="sbadges" id="tok-sum"></div><div class="tw"><table><thead><tr><th>#</th><th>Type</th><th>Value</th><th>Ln</th><th>Col</th></tr></thead><tbody id="tok-tb"><tr><td colspan="5" class="empty">Click <b>Compile &amp; Run</b>.</td></tr></tbody></table></div></div>
+    <div id="panel-p2" class="hidden">
+      <div class="card-title">Abstract Syntax Tree</div>
+      <div class="ast-wrap" id="ast-c"><div class="empty">Click <b>Compile &amp; Run</b>.</div></div>
+      <div class="card-title" style="margin-top:12px;display:flex;align-items:center;gap:8px;">Parse Tree <span style="color:var(--muted);font-size:12px;">(derived from parser)</span></div>
+      <div class="ast-wrap" id="parse-c"><div class="empty">Click <b>Compile &amp; Run</b>.</div></div>
+    </div>
+    <div id="panel-p3" class="hidden"><div class="card-title">Symbol Table</div><div class="tw"><table><thead><tr><th>Name</th><th>Type</th><th>Scope</th><th>Ln</th></tr></thead><tbody id="sym-tb"><tr><td colspan="4" class="empty">Click <b>Compile &amp; Run</b>.</td></tr></tbody></table></div><div class="card-title" style="margin-top:10px">Semantic Warnings</div><div id="sem-warn" class="empty">No warnings.</div></div>
+    <div id="panel-p4" class="hidden"><div class="cw" id="tac-c"><div class="empty" style="padding:36px">Click <b>Compile &amp; Run</b>.</div></div></div>
+    <div id="panel-p5" class="hidden"><div class="cw" id="opt-c"><div class="empty" style="padding:36px">Click <b>Compile &amp; Run</b>.</div></div><div class="card-title" style="margin-top:10px">Applied Optimizations</div><div style="max-height:200px;overflow:auto" id="opts-c"><div class="empty">None.</div></div></div>
+    <div id="panel-p6" class="hidden"><div class="cw" id="asm-c"><div class="empty" style="padding:36px">Click <b>Compile &amp; Run</b>.</div></div></div>
+    <div id="panel-p7" class="hidden"><div class="parse-summary" id="sum-stats"></div><div class="card-title">Compilation Pipeline</div><div class="cw" id="pipeline-c"><div class="empty" style="padding:36px">Click <b>Compile &amp; Run</b>.</div></div></div>
+  </div>
+</div>
+<footer>
+  <div>Name: <strong>Vijay Anand</strong></div>
+  <div>Registration Number: <strong>RA2311003050380</strong></div>
+</footer>
+</div>
+
+<script>
+/* ═══════════════════ PHASE 1: LEXER ═══════════════════ */
+const KW=new Set(["auto","break","case","char","const","continue","default","do","double","else","enum","extern","float","for","goto","if","int","long","register","return","short","signed","sizeof","static","struct","switch","typedef","union","unsigned","void","volatile","while","print","input","def","class","import","from","as","try","except","finally","raise","with","yield","lambda","pass","True","False","None","and","or","not","in","is","elif"]);
+const MOP=new Set(["==","!=","<=",">=","&&","||","++","--","+=","-=","*=","/=","<<",">>","->","**","//"]);
+const SOP=new Set([..."+-*/%=<>!&|^~?:@"]),DLM=new Set([..."(){}[];,."]);
+function tokenize(src){const T=[];let p=0,ln=1,co=1;const c=()=>p<src.length?src[p]:null,pk=()=>p+1<src.length?src[p+1]:null,a=()=>{if(src[p]==='\n'){ln++;co=1}else co++;p++},ad=(t,v,l,cl)=>T.push({type:t,value:v,line:l,column:cl});while(p<src.length){while(c()&&' \t\r'.includes(c()))a();const ch=c();if(!ch)break;if(ch==='\n'){ad('NEWLINE','\\n',ln,co);a();continue}if(ch==='#'){const sl=ln,sc=co;let d='';while(c()&&c()!=='\n'){d+=c();a()}ad('PREPROCESSOR',d,sl,sc);continue}if(ch==='/'&&pk()==='/'){const sl=ln,sc=co;let cm='';while(c()&&c()!=='\n'){cm+=c();a()}ad('COMMENT',cm,sl,sc);continue}if(ch==='/'&&pk()==='*'){const sl=ln,sc=co;let cm='/*';a();a();while(c()){if(c()==='*'&&pk()==='/'){cm+='*/';a();a();break}cm+=c();a()}ad('COMMENT',cm,sl,sc);continue}if(ch>='0'&&ch<='9'){const sl=ln,sc=co;let n='',f=false;while(c()&&(/\d/.test(c())||c()==='.')){if(c()==='.'){if(f)break;f=true}n+=c();a()}ad(f?'FLOAT':'INTEGER',n,sl,sc);continue}if(/[a-zA-Z_]/.test(ch)){const sl=ln,sc=co;let w='';while(c()&&/[a-zA-Z0-9_]/.test(c())){w+=c();a()}ad(KW.has(w)?'KEYWORD':'IDENTIFIER',w,sl,sc);continue}if(ch==='"'||ch=="'"){const sl=ln,sc=co,q=ch;let s=q;a();while(c()&&c()!==q){if(c()==='\\'){s+=c();a()}if(c()){s+=c();a()}}if(c()===q){s+=c();a()}ad('STRING',s,sl,sc);continue}if(pk()&&MOP.has(ch+pk())){ad('OPERATOR',ch+pk(),ln,co);a();a();continue}if(SOP.has(ch)){ad('OPERATOR',ch,ln,co);a();continue}if(DLM.has(ch)){ad('DELIMITER',ch,ln,co);a();continue}ad('UNKNOWN',ch,ln,co);a();}return T;}
+
+/* ═══════════════════ AST NODE ═══════════════════ */
+class N{constructor(t,v=null,l=0,c=0){this.type=t;this.value=v;this.line=l;this.column=c;this.children=[];}add(ch){if(ch)this.children.push(ch);return this;}count(){let c=1;for(const x of this.children)c+=x.count();return c;}}
+
+/* ═══════════════════ PHASE 2: PARSER ═══════════════════ */
+class Parser{
+constructor(tk){this.tk=tk.filter(t=>t.type!=='NEWLINE'&&t.type!=='COMMENT');this.p=0;this.errors=[];this.ast=new N('PROGRAM');}
+c(){return this.p<this.tk.length?this.tk[this.p]:null;}adv(){const t=this.c();this.p++;return t;}
+err(m,t){t=t||this.c();this.errors.push(t?{message:m,line:t.line,column:t.column,value:t.value}:{message:m,line:0,column:0,value:'EOF'});}
+expect(ty,v){const t=this.c();if(!t){this.err(`Expected ${ty}${v?" '"+v+"'":''},got EOF`);return null;}if(t.type!==ty||(v!==undefined&&t.value!==v)){this.err(`Expected ${ty}${v?" '"+v+"'":''},got '${t.value}'`,t);return null;}return this.adv();}
+match(ty,v){const t=this.c();if(!t||t.type!==ty)return false;return v===undefined||t.value===v;}
+mkw(ks){const t=this.c();return t&&t.type==='KEYWORD'&&ks.includes(t.value);}
+parse(){while(this.c()){if(this.match('PREPROCESSOR')){this.ast.add(new N('PREPROCESSOR',this.c().value,this.c().line,this.c().column));this.adv();continue;}const s=this.pS();if(s)this.ast.add(s);else{if(this.c()){this.err(`Unexpected '${this.c().value}'`);this.adv();}}}return this.ast;}
+pS(){const t=this.c();if(!t)return null;const cT=["int","float","double","char","void","long","short","signed","unsigned","auto","static","extern","register","const","volatile"];if(t.type==='KEYWORD'&&cT.includes(t.value))return this.pDecl();if(this.match('KEYWORD','return'))return this.pRet();if(this.match('KEYWORD','if'))return this.pIf();if(this.match('KEYWORD','while'))return this.pWh();if(this.match('KEYWORD','do'))return this.pDW();if(this.match('KEYWORD','for'))return this.pFor();if(this.match('KEYWORD','switch'))return this.pSw();if(this.match('KEYWORD','break')){const t2=this.adv();if(this.match('DELIMITER',';'))this.adv();return new N('BREAK',null,t2.line,t2.column);}if(this.match('KEYWORD','continue')){const t2=this.adv();if(this.match('DELIMITER',';'))this.adv();return new N('CONTINUE',null,t2.line,t2.column);}if(this.match('KEYWORD','def'))return this.pPyDef();if(this.match('KEYWORD','class'))return this.pPyCls();if(this.match('KEYWORD','import')||this.match('KEYWORD','from'))return this.pPyImp();if(this.match('KEYWORD','elif'))return this.pElif();if(this.match('KEYWORD','try')){const t2=this.adv();if(this.match('OPERATOR',':'))this.adv();return new N('TRY',null,t2.line,t2.column);}if(this.match('KEYWORD','except')){const t2=this.adv();const n=new N('EXCEPT',null,t2.line,t2.column);if(this.c()&&!this.match('OPERATOR',':')){const e=this.pE();if(e)n.add(e);if(this.match('KEYWORD','as')){this.adv();if(this.match('IDENTIFIER'))n.add(new N('ALIAS',this.adv().value));}}if(this.match('OPERATOR',':'))this.adv();return n;}if(this.match('KEYWORD','finally')){const t2=this.adv();if(this.match('OPERATOR',':'))this.adv();return new N('FINALLY',null,t2.line,t2.column);}if(this.match('KEYWORD','with')){const t2=this.adv(),n=new N('WITH',null,t2.line,t2.column);const e=this.pE();if(e)n.add(e);if(this.match('KEYWORD','as')){this.adv();if(this.match('IDENTIFIER'))n.add(new N('ALIAS',this.adv().value));}if(this.match('OPERATOR',':'))this.adv();return n;}if(this.match('KEYWORD','raise')){const t2=this.adv(),n=new N('RAISE',null,t2.line,t2.column);if(this.c()&&!this.match('DELIMITER',';')&&!this.match('OPERATOR',':')){const e=this.pE();if(e)n.add(e);}return n;}if(this.match('KEYWORD','pass'))return new N('PASS',null,this.adv().line,0);if(this.match('KEYWORD','yield')){const t2=this.adv(),n=new N('YIELD',null,t2.line,t2.column);if(this.c()&&!this.match('DELIMITER',';')){const e=this.pE();if(e)n.add(e);}return n;}if(this.match('KEYWORD','print'))return this.pES();if(this.match('KEYWORD','struct')){const t2=this.adv(),n=new N('STRUCT',null,t2.line,t2.column);if(this.match('IDENTIFIER'))n.value=this.adv().value;if(this.match('DELIMITER','{'))n.add(this.pBl());if(this.match('DELIMITER',';'))this.adv();return n;}if(this.match('KEYWORD','enum')){const t2=this.adv(),n=new N('ENUM',null,t2.line,t2.column);if(this.match('IDENTIFIER'))n.value=this.adv().value;if(this.match('DELIMITER','{')){this.adv();while(this.c()&&!this.match('DELIMITER','}')){if(this.match('IDENTIFIER')){const ev=this.adv(),m=new N('MEMBER',ev.value);if(this.match('OPERATOR','=')){this.adv();const e=this.pE();if(e)m.add(e);}n.add(m);}if(this.match('DELIMITER',','))this.adv();else break;}this.expect('DELIMITER','}');}if(this.match('DELIMITER',';'))this.adv();return n;}if(this.match('KEYWORD','typedef')){const t2=this.adv(),n=new N('TYPEDEF',null,t2.line,t2.column),parts=[];while(this.c()&&!this.match('DELIMITER',';')){parts.push(this.c().value);this.adv();}if(parts.length)n.value=parts.join(' ');this.expect('DELIMITER',';');return n;}if(this.match('KEYWORD','goto')){const t2=this.adv(),n=new N('GOTO',null,t2.line,t2.column);if(this.match('IDENTIFIER'))n.add(new N('LABEL',this.adv().value));this.expect('DELIMITER',';');return n;}if(this.match('DELIMITER','{'))return this.pBl();if(['IDENTIFIER','INTEGER','FLOAT','STRING','DELIMITER','OPERATOR','KEYWORD'].includes(t.type))return this.pES();return null;}
+pDecl(){const st=this.c(),nL=st.line,nC=st.column;let ts='';const cT=["int","float","double","char","void","long","short","signed","unsigned","auto","static","extern","register","const","volatile"];while(this.c()&&this.c().type==='KEYWORD'&&cT.includes(this.c().value)){ts+=(ts?' ':'')+this.c().value;this.adv();}while(this.match('OPERATOR','*')){ts+='*';this.adv();}if(!this.match('IDENTIFIER')){this.err(`Expected id after '${ts}'`);return new N('ERROR',ts,nL,nC);}const nm=this.adv();if(this.match('DELIMITER','('))return this.pFD(ts,nm,nL,nC);const nd=new N('VAR_DECL',ts,nL,nC),vn=new N('VARIABLE',nm.value,nm.line,nm.column);if(this.match('DELIMITER','[')){this.adv();if(this.c()&&(this.c().type==='INTEGER'||this.c().type==='IDENTIFIER')){vn.add(new N('ARRAY_SIZE',this.c().value));this.adv();}this.expect('DELIMITER',']');}if(this.match('OPERATOR','=')){this.adv();const e=this.pE();if(e){const i=new N('INITIALIZER');i.add(e);vn.add(i);}}nd.add(vn);while(this.match('DELIMITER',',')){this.adv();if(this.match('OPERATOR','*'))this.adv();if(this.match('IDENTIFIER')){const nv=this.adv(),nn=new N('VARIABLE',nv.value,nv.line,nv.column);if(this.match('OPERATOR','=')){this.adv();const e=this.pE();if(e){const i=new N('INITIALIZER');i.add(e);nn.add(i);}}nd.add(nn);}}this.expect('DELIMITER',';');return nd;}
+pFD(rt,nm,l,co){const n=new N('FUNC_DEF',nm.value,l,co);n.add(new N('RETURN_TYPE',rt,l,co));const pn=new N('PARAMETERS');this.expect('DELIMITER','(');if(!this.match('DELIMITER',')')){const cT=["int","float","double","char","void","long","short","signed","unsigned","const"];while(true){const p=new N('PARAM');let ts='';while(this.c()&&this.c().type==='KEYWORD'&&cT.includes(this.c().value)){ts+=(ts?' ':'')+this.c().value;this.adv();}while(this.match('OPERATOR','*')){ts+='*';this.adv();}if(ts)p.add(new N('TYPE',ts));if(this.match('IDENTIFIER')){const nm2=this.adv();p.add(new N('NAME',nm2.value,nm2.line,nm2.column));}pn.add(p);if(this.match('DELIMITER',','))this.adv();else break;}}this.expect('DELIMITER',')');n.add(pn);if(this.match('DELIMITER','{'))n.add(this.pBl());else this.expect('DELIMITER',';');return n;}
+pBl(){const t=this.c(),n=new N('BLOCK',null,t?t.line:0,t?t.column:0);this.expect('DELIMITER','{');while(this.c()&&!this.match('DELIMITER','}')){const s=this.pS();if(s)n.add(s);else{if(this.c()&&!this.match('DELIMITER','}')){this.err('Unexpected in block');this.adv();}}}this.expect('DELIMITER','}');return n;}
+pRet(){const t=this.adv(),n=new N('RETURN',null,t.line,t.column);if(!this.match('DELIMITER',';')){const e=this.pE();if(e)n.add(e);}this.expect('DELIMITER',';');return n;}
+pIf(){const t=this.adv(),n=new N('IF',null,t.line,t.column);if(this.match('DELIMITER','(')){this.adv();const c2=this.pE(),cn=new N('CONDITION');if(c2)cn.add(c2);n.add(cn);this.expect('DELIMITER',')');}else{const c2=this.pE(),cn=new N('CONDITION');if(c2)cn.add(c2);n.add(cn);if(this.match('OPERATOR',':'))this.adv();}if(this.match('DELIMITER','{'))n.add(this.pBl());else{const s=this.pS();if(s){const b=new N('BODY');b.add(s);n.add(b);}}if(this.match('KEYWORD','else')){this.adv();if(this.match('KEYWORD','if')){const en=new N('ELSE_IF');en.add(this.pIf());n.add(en);}else if(this.match('DELIMITER','{')){const en=new N('ELSE');en.add(this.pBl());n.add(en);}else{if(this.match('OPERATOR',':'))this.adv();const en=new N('ELSE'),s=this.pS();if(s)en.add(s);n.add(en);}}return n;}
+pElif(){const t=this.adv(),n=new N('ELIF',null,t.line,t.column),c2=this.pE(),cn=new N('CONDITION');if(c2)cn.add(c2);n.add(cn);if(this.match('OPERATOR',':'))this.adv();const s=this.pS();if(s){const b=new N('BODY');b.add(s);n.add(b);}return n;}
+pWh(){const t=this.adv(),n=new N('WHILE',null,t.line,t.column);if(this.match('DELIMITER','(')){this.adv();const c2=this.pE(),cn=new N('CONDITION');if(c2)cn.add(c2);n.add(cn);this.expect('DELIMITER',')');}else{const c2=this.pE(),cn=new N('CONDITION');if(c2)cn.add(c2);n.add(cn);if(this.match('OPERATOR',':'))this.adv();}if(this.match('DELIMITER','{'))n.add(this.pBl());else{const s=this.pS();if(s){const b=new N('BODY');b.add(s);n.add(b);}}return n;}
+pDW(){const t=this.adv(),n=new N('DO_WHILE',null,t.line,t.column);if(this.match('DELIMITER','{'))n.add(this.pBl());this.expect('KEYWORD','while');if(this.match('DELIMITER','(')){this.adv();const c2=this.pE(),cn=new N('CONDITION');if(c2)cn.add(c2);n.add(cn);this.expect('DELIMITER',')');}this.expect('DELIMITER',';');return n;}
+pFor(){const t=this.adv(),n=new N('FOR',null,t.line,t.column);if(this.match('DELIMITER','(')){this.adv();const init=new N('INIT');if(!this.match('DELIMITER',';')){const e=this.pED();if(e)init.add(e);}n.add(init);if(this.match('DELIMITER',';'))this.adv();const cond=new N('CONDITION');if(!this.match('DELIMITER',';')){const c2=this.pE();if(c2)cond.add(c2);}n.add(cond);if(this.match('DELIMITER',';'))this.adv();const upd=new N('UPDATE');if(!this.match('DELIMITER',')')){const u=this.pE();if(u)upd.add(u);}n.add(upd);this.expect('DELIMITER',')');if(this.match('DELIMITER','{'))n.add(this.pBl());else{const s=this.pS();if(s){const b=new N('BODY');b.add(s);n.add(b);}}}else{if(this.match('IDENTIFIER')){const vt=this.adv();n.add(new N('ITERATOR',vt.value,vt.line,vt.column));}this.expect('KEYWORD','in');const it=this.pE();if(it){const itn=new N('ITERABLE');itn.add(it);n.add(itn);}if(this.match('OPERATOR',':'))this.adv();const s=this.pS();if(s){const b=new N('BODY');b.add(s);n.add(b);}}return n;}
+pSw(){const t=this.adv(),n=new N('SWITCH',null,t.line,t.column);this.expect('DELIMITER','(');const e=this.pE(),en=new N('SWITCH_EXPR');if(e)en.add(e);n.add(en);this.expect('DELIMITER',')');this.expect('DELIMITER','{');while(this.c()&&!this.match('DELIMITER','}')){if(this.match('KEYWORD','case')){const ct=this.adv(),cn=new N('CASE',null,ct.line,ct.column),ce=this.pE();if(ce)cn.add(ce);this.expect('OPERATOR',':');while(this.c()&&!this.match('KEYWORD','case')&&!this.match('KEYWORD','default')&&!this.match('DELIMITER','}')){const s=this.pS();if(s)cn.add(s);else break;}n.add(cn);}else if(this.match('KEYWORD','default')){const dt=this.adv(),dn=new N('DEFAULT',null,dt.line,dt.column);this.expect('OPERATOR',':');while(this.c()&&!this.match('DELIMITER','}')){const s=this.pS();if(s)dn.add(s);else break;}n.add(dn);}else{this.err("Expected case/default");this.adv();}}this.expect('DELIMITER','}');return n;}
+pPyDef(){const t=this.adv(),n=new N('FUNC_DEF',null,t.line,t.column);if(this.match('IDENTIFIER'))n.value=this.adv().value;const pn=new N('PARAMETERS');if(this.match('DELIMITER','(')){this.adv();while(!this.match('DELIMITER',')')&&this.c()){if(this.match('OPERATOR','*'))this.adv();if(this.match('IDENTIFIER')){const pt=this.adv(),p=new N('PARAM',pt.value,pt.line,pt.column);if(this.match('OPERATOR','=')){this.adv();const d=this.pE();if(d){const dn=new N('DEFAULT');dn.add(d);p.add(dn);}}pn.add(p);}if(this.match('DELIMITER',','))this.adv();else break;}this.expect('DELIMITER',')');}n.add(pn);if(this.match('OPERATOR',':'))this.adv();return n;}
+pPyCls(){const t=this.adv(),n=new N('CLASS_DEF',null,t.line,t.column);if(this.match('IDENTIFIER'))n.value=this.adv().value;if(this.match('DELIMITER','(')){this.adv();const bases=new N('BASES');while(!this.match('DELIMITER',')')&&this.c()){if(this.match('IDENTIFIER'))bases.add(new N('BASE',this.adv().value));if(this.match('DELIMITER',','))this.adv();else break;}this.expect('DELIMITER',')');n.add(bases);}if(this.match('OPERATOR',':'))this.adv();return n;}
+pPyImp(){const t=this.adv(),n=new N('IMPORT',null,t.line,t.column);if(t.value==='from'){if(this.match('IDENTIFIER'))n.add(new N('MODULE',this.adv().value));this.expect('KEYWORD','import');while(this.match('IDENTIFIER')){const imp=this.adv(),in_=new N('NAME',imp.value);if(this.match('KEYWORD','as')){this.adv();if(this.match('IDENTIFIER'))in_.add(new N('ALIAS',this.adv().value));}n.add(in_);if(this.match('DELIMITER',','))this.adv();else break;}}else{while(this.match('IDENTIFIER')){const m=this.adv(),mn=new N('MODULE',m.value);while(this.match('DELIMITER','.')){this.adv();if(this.match('IDENTIFIER'))mn.value+='.'+this.adv().value;}if(this.match('KEYWORD','as')){this.adv();if(this.match('IDENTIFIER'))mn.add(new N('ALIAS',this.adv().value));}n.add(mn);if(this.match('DELIMITER',','))this.adv();else break;}}return n;}
+pES(){const e=this.pE();if(!e)return null;const n=new N('EXPR_STMT',null,e.line,e.column);n.add(e);if(this.match('DELIMITER',';'))this.adv();return n;}
+pED(){const cT=["int","float","double","char","long","short","signed","unsigned"];if(this.c()&&this.c().type==='KEYWORD'&&cT.includes(this.c().value)){const tt=this.adv(),n=new N('VAR_DECL',tt.value,tt.line,tt.column);if(this.match('IDENTIFIER')){const nm2=this.adv(),vn=new N('VARIABLE',nm2.value,nm2.line,nm2.column);if(this.match('OPERATOR','=')){this.adv();const e=this.pE();if(e){const i=new N('INITIALIZER');i.add(e);vn.add(i);}}n.add(vn);}return n;}return this.pE();}
+pE(){let l=this.pTe();if(!l)return null;const aO=['=','+=','-=','*=','/='];if(this.c()&&this.c().type==='OPERATOR'&&aO.includes(this.c().value)){const op=this.adv(),r=this.pE(),n=new N('ASSIGN',op.value,op.line,op.column);n.add(l);if(r)n.add(r);return n;}return l;}
+pTe(){let l=this.pLO();if(l&&this.match('OPERATOR','?')){this.adv();const t2=this.pE();this.expect('OPERATOR',':');const f=this.pE();const n=new N('TERNARY','?:',l.line,l.column);n.add(l);if(t2)n.add(t2);if(f)n.add(f);return n;}return l;}
+pLO(){let l=this.pLA();while(this.c()&&['OPERATOR','KEYWORD'].includes(this.c().type)&&['||','or'].includes(this.c().value)){const op=this.adv(),r=this.pLA(),n=new N('LOG_OR',op.value,op.line,op.column);n.add(l);if(r)n.add(r);l=n;}return l;}
+pLA(){let l=this.pEq();while(this.c()&&['OPERATOR','KEYWORD'].includes(this.c().type)&&['&&','and'].includes(this.c().value)){const op=this.adv(),r=this.pEq(),n=new N('LOG_AND',op.value,op.line,op.column);n.add(l);if(r)n.add(r);l=n;}return l;}
+pEq(){let l=this.pRl();while(this.c()&&this.c().type==='OPERATOR'&&['==','!='].includes(this.c().value)){const op=this.adv(),r=this.pRl(),n=new N('EQUALITY',op.value,op.line,op.column);n.add(l);if(r)n.add(r);l=n;}return l;}
+pRl(){let l=this.pAd();while(this.c()&&this.c().type==='OPERATOR'&&['<','>','<=','>='].includes(this.c().value)){const op=this.adv(),r=this.pAd(),n=new N('RELATIONAL',op.value,op.line,op.column);n.add(l);if(r)n.add(r);l=n;}if(this.mkw(['in','is','not'])){let ov=this.adv().value;if(ov==='not'&&this.match('KEYWORD','in')){ov='not in';this.adv();}else if(ov==='is'&&this.match('KEYWORD','not')){ov='is not';this.adv();}const r=this.pAd(),n=new N('RELATIONAL',ov,l?l.line:0,l?l.column:0);n.add(l);if(r)n.add(r);l=n;}return l;}
+pAd(){let l=this.pMu();while(this.c()&&this.c().type==='OPERATOR'&&['+','-'].includes(this.c().value)){const op=this.adv(),r=this.pMu(),n=new N('BIN_OP',op.value,op.line,op.column);n.add(l);if(r)n.add(r);l=n;}return l;}
+pMu(){let l=this.pUn();while(this.c()&&this.c().type==='OPERATOR'&&['*','/','%','//'].includes(this.c().value)){const op=this.adv(),r=this.pUn(),n=new N('BIN_OP',op.value,op.line,op.column);n.add(l);if(r)n.add(r);l=n;}return l;}
+pUn(){if(this.c()&&this.c().type==='OPERATOR'&&['+','-','!','~','*','&'].includes(this.c().value)){const op=this.adv(),o=this.pUn(),n=new N('UNARY',op.value,op.line,op.column);if(o)n.add(o);return n;}if(this.match('KEYWORD','not')){const op=this.adv(),o=this.pUn(),n=new N('UNARY','not',op.line,op.column);if(o)n.add(o);return n;}if(this.match('KEYWORD','sizeof')){const op=this.adv(),n=new N('SIZEOF',null,op.line,op.column);if(this.match('DELIMITER','(')){this.adv();const e=this.pE();if(e)n.add(e);this.expect('DELIMITER',')');}return n;}if(this.c()&&this.c().type==='OPERATOR'&&['++','--'].includes(this.c().value)){const op=this.adv(),o=this.pUn(),n=new N('PREFIX',op.value,op.line,op.column);if(o)n.add(o);return n;}return this.pPo();}
+pPo(){let l=this.pPr();if(!l)return null;while(this.c()){if(this.match('DELIMITER','(')){this.adv();const call=new N('CALL',null,l.line,l.column);call.add(l);const args=new N('ARGS');if(!this.match('DELIMITER',')')){let a2=this.pE();if(a2)args.add(a2);while(this.match('DELIMITER',',')){this.adv();a2=this.pE();if(a2)args.add(a2);}}call.add(args);this.expect('DELIMITER',')');l=call;continue;}if(this.match('DELIMITER','[')){this.adv();const acc=new N('INDEX',null,l.line,l.column);acc.add(l);const idx=this.pE();if(idx)acc.add(idx);this.expect('DELIMITER',']');l=acc;continue;}if(this.match('DELIMITER','.')){this.adv();const mem=new N('DOT',null,l.line,l.column);mem.add(l);if(this.match('IDENTIFIER'))mem.add(new N('MEMBER',this.adv().value));l=mem;continue;}if(this.match('OPERATOR','->')){this.adv();const arr=new N('ARROW',null,l.line,l.column);arr.add(l);if(this.match('IDENTIFIER'))arr.add(new N('MEMBER',this.adv().value));l=arr;continue;}if(this.c()&&this.c().type==='OPERATOR'&&['++','--'].includes(this.c().value)){const op=this.adv(),n=new N('POSTFIX',op.value,op.line,op.column);n.add(l);l=n;continue;}break;}return l;}
+pPr(){const t=this.c();if(!t)return null;if(t.type==='INTEGER'){this.adv();return new N('INT',t.value,t.line,t.column);}if(t.type==='FLOAT'){this.adv();return new N('FLOAT',t.value,t.line,t.column);}if(t.type==='STRING'){this.adv();return new N('STRING',t.value,t.line,t.column);}if(t.type==='KEYWORD'&&(t.value==='True'||t.value==='False')){this.adv();return new N('BOOL',t.value,t.line,t.column);}if(t.type==='KEYWORD'&&t.value==='None'){this.adv();return new N('NONE',t.value,t.line,t.column);}if(t.type==='IDENTIFIER'){this.adv();return new N('ID',t.value,t.line,t.column);}if(t.type==='KEYWORD'&&(t.value==='print'||t.value==='input')){this.adv();return new N('ID',t.value,t.line,t.column);}if(this.match('DELIMITER','(')){this.adv();const e=this.pE();this.expect('DELIMITER',')');if(e){const g=new N('GROUP',null,t.line,t.column);g.add(e);return g;}return null;}if(this.match('DELIMITER','[')){this.adv();const n=new N('LIST',null,t.line,t.column);if(!this.match('DELIMITER',']')){let el=this.pE();if(el)n.add(el);while(this.match('DELIMITER',',')){this.adv();if(this.match('DELIMITER',']'))break;el=this.pE();if(el)n.add(el);}}this.expect('DELIMITER',']');return n;}return null;}
+}
+
+/* ═══════════════════ PHASE 3: SEMANTIC ═══════════════════ */
+class Sem{
+  constructor(){this.symbols=[];this.warnings=[];}
+  analyze(ast){this.v(ast,'global');return{symbols:this.symbols,warnings:this.warnings};}
+  v(n,sc){
+    if(!n)return;
+    if(n.type==='FUNC_DEF'){
+      this.symbols.push({name:n.value||'?',type:'function',scope:sc,line:n.line});
+      for(const ch of n.children)this.v(ch,n.value||'local');
+      return;
+    }
+    if(n.type==='VAR_DECL'){
+      for(const v of n.children){
+        if(v.type==='VARIABLE'){
+          const ex=this.symbols.find(s=>s.name===v.value&&s.scope===sc);
+          if(ex)this.warnings.push({msg:`Redeclaration of '${v.value}'`,line:v.line});
+          this.symbols.push({name:v.value,type:n.value||'?',scope:sc,line:v.line});
+        }
+      }
+      for(const ch of n.children)this.v(ch,sc);
+      return;
+    }
+    if(n.type==='CLASS_DEF'){
+      this.symbols.push({name:n.value||'?',type:'class',scope:sc,line:n.line});
+      for(const ch of n.children)this.v(ch,n.value||'class');
+      return;
+    }
+    if(n.type==='PARAM'){
+      const nm=n.value||(n.children.find(c=>c.type==='NAME')||{}).value;
+      if(nm)this.symbols.push({name:nm,type:'param',scope:sc,line:n.line});
+      for(const ch of n.children)this.v(ch,sc);
+      return;
+    }
+    for(const ch of n.children)this.v(ch,sc);
+  }
+}
+
+/* ═══════════════════ PHASE 4: TAC ═══════════════════ */
+class TAC{constructor(){this.code=[];this.tc=0;this.lc=0;}nT(){return`t${this.tc++}`;}nL(){return`L${this.lc++}`;}emit(l,ty){this.code.push({text:l,type:ty||'op'});}
+generate(ast){for(const ch of ast.children)this.vS(ch);return this.code;}
+vS(n){if(!n)return;switch(n.type){case'PREPROCESSOR':this.emit(`; ${n.value}`,'comment');break;case'FUNC_DEF':this.vFn(n);break;case'VAR_DECL':this.vVD(n);break;case'EXPR_STMT':this.vE(n.children[0]);break;case'RETURN':{if(n.children.length){const v=this.vE(n.children[0]);this.emit(`return ${v}`,'return');}else this.emit('return','return');break;}case'IF':this.vIf(n);break;case'WHILE':this.vWh(n);break;case'DO_WHILE':{const cn=n.children.find(c=>c.type==='CONDITION'),bn=n.children.find(c=>c.type==='BLOCK');const lS=this.nL();this.emit(`${lS}:`,'label');if(bn)this.vS(bn);if(cn&&cn.children[0]){const cv=this.vE(cn.children[0]);this.emit(`if ${cv} goto ${lS}`,'goto');}break;}case'FOR':this.vFr(n);break;case'SWITCH':this.vSw(n);break;case'BLOCK':for(const c of n.children)this.vS(c);break;case'BREAK':this.emit('goto _break','goto');break;case'CONTINUE':this.emit('goto _continue','goto');break;default:for(const c of n.children)this.vS(c);}}
+vFn(n){const nm=n.value||'anon';this.emit('','blank');this.emit(`func_begin ${nm}:`,'label');const ps=n.children.find(c=>c.type==='PARAMETERS');if(ps)for(const p of ps.children){const nm2=p.value||(p.children.find(c=>c.type==='NAME')||{}).value;if(nm2)this.emit(`param ${nm2}`,'param');}const bl=n.children.find(c=>c.type==='BLOCK');if(bl)for(const c of bl.children)this.vS(c);this.emit(`func_end ${nm}`,'label');}
+vVD(n){for(const v of n.children){if(v.type!=='VARIABLE')continue;const init=v.children.find(c=>c.type==='INITIALIZER');if(init&&init.children[0]){const val=this.vE(init.children[0]);this.emit(`${v.value} = ${val}`,'assign');}else this.emit(`${v.value} = 0`,'assign');}}
+vIf(n){const cn=n.children.find(c=>c.type==='CONDITION'),bb=n.children.find(c=>c.type==='BLOCK'||c.type==='BODY'),el=n.children.find(c=>c.type==='ELSE'),eif=n.children.find(c=>c.type==='ELSE_IF');const lT=this.nL(),lF=this.nL(),lE=this.nL();if(cn&&cn.children[0]){const cv=this.vE(cn.children[0]);this.emit(`if ${cv} goto ${lT}`,'goto');this.emit(`goto ${lF}`,'goto');}this.emit(`${lT}:`,'label');if(bb)this.vS(bb);if(el||eif)this.emit(`goto ${lE}`,'goto');this.emit(`${lF}:`,'label');if(eif)this.vS(eif.children[0]);else if(el)for(const c of el.children)this.vS(c);if(el||eif)this.emit(`${lE}:`,'label');}
+vWh(n){const cn=n.children.find(c=>c.type==='CONDITION'),bn=n.children.find(c=>c.type==='BLOCK'||c.type==='BODY');const lS=this.nL(),lB=this.nL(),lE=this.nL();this.emit(`${lS}:`,'label');if(cn&&cn.children[0]){const cv=this.vE(cn.children[0]);this.emit(`if ${cv} goto ${lB}`,'goto');this.emit(`goto ${lE}`,'goto');}this.emit(`${lB}:`,'label');if(bn)this.vS(bn);this.emit(`goto ${lS}`,'goto');this.emit(`${lE}:`,'label');}
+vFr(n){const initN=n.children.find(c=>c.type==='INIT'),condN=n.children.find(c=>c.type==='CONDITION'),updN=n.children.find(c=>c.type==='UPDATE'),bodyN=n.children.find(c=>c.type==='BLOCK'||c.type==='BODY'),iterN=n.children.find(c=>c.type==='ITERATOR'),itblN=n.children.find(c=>c.type==='ITERABLE');if(iterN){const itV=itblN&&itblN.children[0]?this.vE(itblN.children[0]):'?';const lS=this.nL(),lB=this.nL(),lE=this.nL(),idx=this.nT();this.emit(`${idx} = 0`,'assign');this.emit(`${lS}:`,'label');const len=this.nT();this.emit(`${len} = len(${itV})`,'assign');const cnd=this.nT();this.emit(`${cnd} = ${idx} < ${len}`,'assign');this.emit(`if ${cnd} goto ${lB}`,'goto');this.emit(`goto ${lE}`,'goto');this.emit(`${lB}:`,'label');this.emit(`${iterN.value} = ${itV}[${idx}]`,'assign');if(bodyN)this.vS(bodyN);this.emit(`${idx} = ${idx} + 1`,'assign');this.emit(`goto ${lS}`,'goto');this.emit(`${lE}:`,'label');}else{if(initN)for(const c of initN.children)this.vS(c);const lS=this.nL(),lB=this.nL(),lE=this.nL();this.emit(`${lS}:`,'label');if(condN&&condN.children[0]){const cv=this.vE(condN.children[0]);this.emit(`if ${cv} goto ${lB}`,'goto');this.emit(`goto ${lE}`,'goto');}this.emit(`${lB}:`,'label');if(bodyN)this.vS(bodyN);if(updN&&updN.children[0])this.vE(updN.children[0]);this.emit(`goto ${lS}`,'goto');this.emit(`${lE}:`,'label');}}
+vSw(n){const exN=n.children.find(c=>c.type==='SWITCH_EXPR');const sv=exN&&exN.children[0]?this.vE(exN.children[0]):'?';const lE=this.nL();const cases=n.children.filter(c=>c.type==='CASE'||c.type==='DEFAULT'),labels=cases.map(()=>this.nL());cases.forEach((cs,i)=>{if(cs.type==='CASE'&&cs.children[0]){const cv=this.vE(cs.children[0]);const t2=this.nT();this.emit(`${t2} = ${sv} == ${cv}`,'assign');this.emit(`if ${t2} goto ${labels[i]}`,'goto');}});const di=cases.findIndex(c=>c.type==='DEFAULT');if(di>=0)this.emit(`goto ${labels[di]}`,'goto');else this.emit(`goto ${lE}`,'goto');cases.forEach((cs,i)=>{this.emit(`${labels[i]}:`,'label');const stmts=cs.children.filter(c=>!['INT','ID','STRING','FLOAT'].includes(c.type));for(const s of stmts)this.vS(s);});this.emit(`${lE}:`,'label');}
+vE(n){if(!n)return'?';switch(n.type){case'INT':case'FLOAT':case'STRING':case'BOOL':case'NONE':return n.value;case'ID':return n.value;case'ASSIGN':{const lhs=n.children[0]?this.vE(n.children[0]):'?',rhs=n.children[1]?this.vE(n.children[1]):'?';if(n.value==='=')this.emit(`${lhs} = ${rhs}`,'assign');else{const t2=this.nT(),op=n.value.replace('=','');this.emit(`${t2} = ${lhs} ${op} ${rhs}`,'assign');this.emit(`${lhs} = ${t2}`,'assign');}return lhs;}case'BIN_OP':case'RELATIONAL':case'EQUALITY':case'LOG_AND':case'LOG_OR':{const l=this.vE(n.children[0]),r=this.vE(n.children[1]),t2=this.nT();this.emit(`${t2} = ${l} ${n.value} ${r}`,'assign');return t2;}case'UNARY':{const o=this.vE(n.children[0]),t2=this.nT();this.emit(`${t2} = ${n.value}${o}`,'assign');return t2;}case'PREFIX':{const o=this.vE(n.children[0]),t2=this.nT();this.emit(`${t2} = ${o} ${n.value==='++'?'+':'-'} 1`,'assign');this.emit(`${o} = ${t2}`,'assign');return t2;}case'POSTFIX':{const o=this.vE(n.children[0]),t2=this.nT(),t3=this.nT();this.emit(`${t2} = ${o}`,'assign');this.emit(`${t3} = ${o} ${n.value==='++'?'+':'-'} 1`,'assign');this.emit(`${o} = ${t3}`,'assign');return t2;}case'CALL':{const fn=n.children[0]?this.vE(n.children[0]):'?',argsN=n.children[1],av=[];if(argsN)for(const a of argsN.children)av.push(this.vE(a));for(const v of av)this.emit(`push_arg ${v}`,'param');const t2=this.nT();this.emit(`${t2} = call ${fn}, ${av.length}`,'call');return t2;}case'INDEX':{const obj=this.vE(n.children[0]),idx=n.children[1]?this.vE(n.children[1]):'?',t2=this.nT();this.emit(`${t2} = ${obj}[${idx}]`,'assign');return t2;}case'DOT':{const obj=this.vE(n.children[0]),mem=n.children[1]?n.children[1].value:'?',t2=this.nT();this.emit(`${t2} = ${obj}.${mem}`,'assign');return t2;}case'GROUP':return this.vE(n.children[0]);case'TERNARY':{const cv=this.vE(n.children[0]),lT=this.nL(),lF=this.nL(),lE=this.nL(),t2=this.nT();this.emit(`if ${cv} goto ${lT}`,'goto');this.emit(`goto ${lF}`,'goto');this.emit(`${lT}:`,'label');const tv=this.vE(n.children[1]);this.emit(`${t2} = ${tv}`,'assign');this.emit(`goto ${lE}`,'goto');this.emit(`${lF}:`,'label');const fv=this.vE(n.children[2]);this.emit(`${t2} = ${fv}`,'assign');this.emit(`${lE}:`,'label');return t2;}case'LIST':{const t2=this.nT(),elems=n.children.map(c=>this.vE(c));this.emit(`${t2} = [${elems.join(', ')}]`,'assign');return t2;}default:if(n.children.length){let last='?';for(const c of n.children)last=this.vE(c);return last;}return n.value||'?';}}
+}
+
+/* ═══════════════════ PHASE 5: OPTIMIZER ═══════════════════ */
+class Opt{constructor(tc){this.code=tc.map(l=>({...l,removed:false}));this.opts=[];this.counts={};}
+ao(ty,cls,msg,b,a){this.opts.push({type:ty,cls,msg,before:b||'',after:a||''});this.counts[ty]=(this.counts[ty]||0)+1;}
+optimize(){this.cf();this.as();this.sr();this.cp();this.cse();this.dce();return{code:this.code,opts:this.opts,counts:this.counts};}
+cf(){const ops={'+':((a,b)=>a+b),'-':((a,b)=>a-b),'*':((a,b)=>a*b)};for(const l of this.code){if(l.removed||l.type!=='assign')continue;const m=l.text.match(/^(\S+)\s*=\s*(-?\d+(?:\.\d+)?)\s*([+\-*])\s*(-?\d+(?:\.\d+)?)\s*$/);if(m&&ops[m[3]]){const r=ops[m[3]](parseFloat(m[2]),parseFloat(m[4]));const nv=Number.isInteger(r)?String(r):r.toFixed(6).replace(/\.?0+$/,'');const bf=l.text;l.text=`${m[1]} = ${nv}`;this.ao('Constant Folding','fold',`${m[2]} ${m[3]} ${m[4]} → ${nv}`,bf,l.text);}}}
+as(){for(const l of this.code){if(l.removed||l.type!=='assign')continue;let m;m=l.text.match(/^(\S+)\s*=\s*(\S+)\s*\+\s*0\s*$/);if(m){const bf=l.text;l.text=`${m[1]} = ${m[2]}`;this.ao('Algebraic Simplification','algebraic',`${m[2]}+0→${m[2]}`,bf,l.text);continue;}m=l.text.match(/^(\S+)\s*=\s*(\S+)\s*-\s*0\s*$/);if(m){const bf=l.text;l.text=`${m[1]} = ${m[2]}`;this.ao('Algebraic Simplification','algebraic',`${m[2]}-0→${m[2]}`,bf,l.text);continue;}m=l.text.match(/^(\S+)\s*=\s*(\S+)\s*\*\s*1\s*$/);if(m){const bf=l.text;l.text=`${m[1]} = ${m[2]}`;this.ao('Algebraic Simplification','algebraic',`${m[2]}*1→${m[2]}`,bf,l.text);continue;}m=l.text.match(/^(\S+)\s*=\s*1\s*\*\s*(\S+)\s*$/);if(m){const bf=l.text;l.text=`${m[1]} = ${m[2]}`;this.ao('Algebraic Simplification','algebraic',`1*${m[2]}→${m[2]}`,bf,l.text);continue;}m=l.text.match(/^(\S+)\s*=\s*(\S+)\s*\*\s*0\s*$/);if(m){const bf=l.text;l.text=`${m[1]} = 0`;this.ao('Algebraic Simplification','algebraic',`${m[2]}*0→0`,bf,l.text);continue;}}}
+sr(){for(const l of this.code){if(l.removed||l.type!=='assign')continue;let m;m=l.text.match(/^(\S+)\s*=\s*(\S+)\s*\*\s*2\s*$/);if(m&&!/^\d/.test(m[2])){const bf=l.text;l.text=`${m[1]} = ${m[2]} << 1`;this.ao('Strength Reduction','strength',`${m[2]}*2→${m[2]}<<1`,bf,l.text);continue;}m=l.text.match(/^(\S+)\s*=\s*2\s*\*\s*(\S+)\s*$/);if(m&&!/^\d/.test(m[2])){const bf=l.text;l.text=`${m[1]} = ${m[2]} << 1`;this.ao('Strength Reduction','strength',`2*${m[2]}→${m[2]}<<1`,bf,l.text);continue;}}}
+cp(){const consts={};for(const l of this.code){if(l.removed||l.type!=='assign')continue;const m=l.text.match(/^(\S+)\s*=\s*(-?\d+(?:\.\d+)?)\s*$/);if(m){consts[m[1]]=m[2];continue;}const m2=l.text.match(/^(\S+)\s*=/);if(m2&&consts[m2[1]])delete consts[m2[1]];for(const[vn,val] of Object.entries(consts)){const parts=l.text.match(/^(\S+\s*=\s*)(.*)/);if(parts){const rhs=parts[2],re=new RegExp(`\\b${vn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`,'g'),nr=rhs.replace(re,val);if(nr!==rhs){const bf=l.text;l.text=parts[1]+nr;this.ao('Constant Propagation','prop',`'${vn}'→'${val}'`,bf,l.text);}}}}}
+cse(){const em={};for(const l of this.code){if(l.removed||l.type!=='assign')continue;const m=l.text.match(/^(\S+)\s*=\s*(.+)$/);if(!m)continue;const[,d,rhs]=m;if(!rhs.match(/\S+\s+[+\-*\/<>=!&|]+\s+\S+/)||rhs.includes('call'))continue;const tr=rhs.trim();if(em[tr]){const bf=l.text;l.text=`${d} = ${em[tr]}`;this.ao('CSE','subexpr',`Reused '${em[tr]}'`,bf,l.text);}else em[tr]=d;}}
+dce(){const assigned=new Map(),used=new Set();for(const l of this.code){if(l.removed)continue;if(['return','goto','call','param','label','comment','blank'].includes(l.type)){const tks=l.text.match(/\b[a-zA-Z_]\w*\b/g);if(tks)tks.forEach(t=>used.add(t));continue;}if(l.type==='assign'){const m=l.text.match(/^(\S+)\s*=\s*(.+)$/);if(m){if(!assigned.has(m[1]))assigned.set(m[1],[]);assigned.get(m[1]).push(l);const tks=m[2].match(/\b[a-zA-Z_]\w*\b/g);if(tks)tks.forEach(t=>used.add(t));}}}for(const[vn,lines] of assigned.entries()){if(/^t\d+$/.test(vn)&&!used.has(vn)){for(const l of lines){const bf=l.text;l.removed=true;this.ao('Dead Code Elimination','dead',`Removed '${vn}'`,bf,'(removed)');}}}}
+}
+
+/* ═══════════════════ PHASE 6: ASM GEN ═══════════════════ */
+class AsmGen{constructor(){this.asm=[];this.regs=['EAX','EBX','ECX','EDX','ESI','EDI','R8D','R9D'];this.regMap={};this.nr=0;this.strs=[];this.si=0;}
+gR(v){if(this.regMap[v])return this.regMap[v];if(this.nr<this.regs.length){const r=this.regs[this.nr++];this.regMap[v]=r;return r;}return`[rbp-${(Object.keys(this.regMap).length+1)*8}]`;}
+e(l,ty){this.asm.push({text:l,type:ty||'instr'});}
+isN(s){return/^-?\d+(\.\d+)?$/.test(s);}isS(s){return/^["']/.test(s);}
+generate(tc){this.e('; Target x86-64 Assembly','comment');this.e('','blank');for(const l of tc){if(l.type==='assign'||l.type==='param'){const sm=l.text.match(/"[^"]*"|'[^']*'/g);if(sm)for(const s of sm){if(!this.strs.find(x=>x.val===s))this.strs.push({label:`_str${this.si++}`,val:s});}}}if(this.strs.length){this.e('section .data','directive');for(const s of this.strs)this.e(`  ${s.label}: db ${s.val}, 0`,'directive');this.e('','blank');}this.e('section .text','directive');this.e('  global _start','directive');this.e('','blank');
+for(const l of tc){if(l.removed)continue;if(l.type==='blank'){this.e('','blank');continue;}if(l.type==='comment'){this.e(`; ${l.text.replace(/^;\s*/,'')}`,'comment');continue;}if(l.type==='label'){const m=l.text.match(/^func_begin\s+(\w+):$/);if(m){this.e(`${m[1]}:`,'label');this.e('  push rbp','instr');this.e('  mov rbp, rsp','instr');this.e('  sub rsp, 128','instr');continue;}const m2=l.text.match(/^func_end\s+(\w+)$/);if(m2){this.e('  leave','instr');this.e('  ret','instr');this.e('','blank');continue;}this.e(`${l.text}`,'label');continue;}if(l.type==='param'){const m2=l.text.match(/^push_arg\s+(.+)$/);if(m2){const v=m2[1];if(this.isS(v)){const sl=this.strs.find(s=>s.val===v);this.e(`  lea rdi, [${sl?sl.label:v}]`,'instr');this.e('  push rdi','instr');}else if(this.isN(v))this.e(`  push ${v}`,'instr');else this.e(`  push ${this.gR(v)}`,'instr');continue;}this.e(`  ; ${l.text}`,'comment');continue;}if(l.type==='call'){const m=l.text.match(/^(\S+)\s*=\s*call\s+(\S+),\s*(\d+)$/);if(m){this.e(`  call ${m[2]}`,'instr');if(parseInt(m[3])>0)this.e(`  add rsp, ${parseInt(m[3])*8}`,'instr');this.e(`  mov ${this.gR(m[1])}, EAX`,'instr');continue;}}if(l.type==='return'){const m=l.text.match(/^return\s+(.+)$/);if(m){this.e(`  mov EAX, ${this.isN(m[1])?m[1]:this.gR(m[1])}`,'instr');this.e('  leave','instr');this.e('  ret','instr');continue;}this.e('  xor EAX, EAX','instr');this.e('  leave','instr');this.e('  ret','instr');continue;}if(l.type==='goto'){const m=l.text.match(/^if\s+(\S+)\s+goto\s+(\S+)$/);if(m){this.e(`  cmp ${this.gR(m[1])}, 0`,'instr');this.e(`  jne ${m[2]}`,'instr');continue;}const m2=l.text.match(/^goto\s+(\S+)$/);if(m2){this.e(`  jmp ${m2[1]}`,'instr');continue;}}if(l.type==='assign'){const m3=l.text.match(/^(\S+)\s*=\s*(\S+)\s*([+\-*\/%]|==|!=|<|>|<=|>=|&&|\|\||<<|>>)\s*(\S+)$/);if(m3){const[,d,a,op,b]=m3,dr=this.gR(d);if(this.isN(a))this.e(`  mov ${dr}, ${a}`,'instr');else{const ar=this.gR(a);if(ar!==dr)this.e(`  mov ${dr}, ${ar}`,'instr');}const bO=this.isN(b)?b:this.gR(b);if(op==='*')this.e(`  imul ${dr}, ${bO}`,'instr');else if(['==','!=','<','>','<=','>='].includes(op)){this.e(`  cmp ${dr}, ${bO}`,'instr');const sm={'==':'sete','!=':'setne','<':'setl','>':'setg','<=':'setle','>=':'setge'};this.e(`  ${sm[op]} al`,'instr');this.e(`  movzx ${dr}, al`,'instr');}else if(op==='<<'||op==='>>'){this.e(`  ${op==='<<'?'shl':'shr'} ${dr}, ${bO}`,'instr');}else{const im={'+':'add','-':'sub','/':'idiv','%':'mod','&&':'and','||':'or'};this.e(`  ${im[op]||'add'} ${dr}, ${bO}`,'instr');}continue;}const m5=l.text.match(/^(\S+)\s*=\s*(.+)$/);if(m5){const dr=this.gR(m5[1]),ts=m5[2].trim();if(this.isN(ts))this.e(`  mov ${dr}, ${ts}`,'instr');else if(this.isS(ts)){const sl=this.strs.find(s=>s.val===ts);this.e(`  lea ${dr}, [${sl?sl.label:ts}]`,'instr');}else this.e(`  mov ${dr}, ${this.gR(ts)}`,'instr');continue;}}this.e(`  ; ${l.text}`,'comment');}
+return{asm:this.asm,regMap:this.regMap,strs:this.strs};}}
+/* ═══════════════════ PHASE 7: AST INTERPRETER (EXECUTION ENGINE) ═══════════════════ */
+class Interpreter{
+constructor(){this.output=[];this.env={};this.funcs={};this.MAX_STEPS=50000;this.steps=0;}
+run(ast){for(const ch of ast.children){if(ch.type==='FUNC_DEF')this.funcs[ch.value]=ch;} const main=this.funcs['main'];if(main){const bl=main.children.find(c=>c.type==='BLOCK');if(bl){const r=this.execBlock(bl,{});if(r&&r._ret!==undefined)this.output.push({text:`Program exited with code ${r._ret}`,cls:'info'});}}else{const globalEnv={};for(const ch of ast.children){if(ch.type!=='FUNC_DEF'&&ch.type!=='PREPROCESSOR')this.execStmt(ch,globalEnv);}}return this.output;}
+guard(){if(++this.steps>this.MAX_STEPS)throw new Error('Execution limit (infinite loop?)');}
+execBlock(n,env){for(const ch of n.children){this.guard();const r=this.execStmt(ch,env);if(r&&(r._ret!==undefined||r._break||r._continue))return r;}return null;}
+execStmt(n,env){if(!n)return null;this.guard();switch(n.type){case'VAR_DECL':for(const v of n.children){if(v.type==='VARIABLE'){const init=v.children.find(c=>c.type==='INITIALIZER');env[v.value]=init&&init.children[0]?this.evalExpr(init.children[0],env):0;}}return null;case'EXPR_STMT':this.evalExpr(n.children[0],env);return null;case'RETURN':{const val=n.children.length?this.evalExpr(n.children[0],env):0;return{_ret:val};}case'IF':return this.execIf(n,env);case'WHILE':return this.execWhile(n,env);case'DO_WHILE':return this.execDoWhile(n,env);case'FOR':return this.execFor(n,env);case'BLOCK':return this.execBlock(n,env);case'BREAK':return{_break:true};case'CONTINUE':return{_continue:true};case'SWITCH':return this.execSwitch(n,env);case'FUNC_DEF':this.funcs[n.value]=n;return null;case'CLASS_DEF':case'IMPORT':case'TRY':case'EXCEPT':case'FINALLY':case'WITH':case'PREPROCESSOR':return null;case'PASS':return null;case'RAISE':this.output.push({text:`RuntimeError: ${n.children[0]?this.evalExpr(n.children[0],env):''}`,cls:'error'});return null;case'ELIF':return this.execElif(n,env);default:return null;}}
+execIf(n,env){const cn=n.children.find(c=>c.type==='CONDITION');const condVal=cn&&cn.children[0]?this.evalExpr(cn.children[0],env):0;if(this.truthy(condVal)){const bb=n.children.find(c=>c.type==='BLOCK'||c.type==='BODY');if(bb)return this.execStmt(bb,env);}else{const eif=n.children.find(c=>c.type==='ELSE_IF');if(eif)return this.execStmt(eif.children[0],env);const el=n.children.find(c=>c.type==='ELSE');if(el){for(const ch of el.children){const r=this.execStmt(ch,env);if(r)return r;}}}return null;}
+execElif(n,env){const cn=n.children.find(c=>c.type==='CONDITION');const condVal=cn&&cn.children[0]?this.evalExpr(cn.children[0],env):0;if(this.truthy(condVal)){const bb=n.children.find(c=>c.type==='BODY');if(bb)return this.execStmt(bb,env);}return null;}
+execWhile(n,env){const cn=n.children.find(c=>c.type==='CONDITION');const bb=n.children.find(c=>c.type==='BLOCK'||c.type==='BODY');while(true){this.guard();const cv=cn&&cn.children[0]?this.evalExpr(cn.children[0],env):0;if(!this.truthy(cv))break;if(bb){const r=this.execStmt(bb,env);if(r){if(r._break)break;if(r._ret!==undefined)return r;}}}}
+execDoWhile(n,env){const cn=n.children.find(c=>c.type==='CONDITION');const bb=n.children.find(c=>c.type==='BLOCK');do{this.guard();if(bb){const r=this.execStmt(bb,env);if(r){if(r._break)break;if(r._ret!==undefined)return r;}}}while(cn&&cn.children[0]&&this.truthy(this.evalExpr(cn.children[0],env)));return null;}
+execFor(n,env){const initN=n.children.find(c=>c.type==='INIT'),condN=n.children.find(c=>c.type==='CONDITION'),updN=n.children.find(c=>c.type==='UPDATE'),bodyN=n.children.find(c=>c.type==='BLOCK'||c.type==='BODY'),iterN=n.children.find(c=>c.type==='ITERATOR'),itblN=n.children.find(c=>c.type==='ITERABLE');if(iterN){const itVal=itblN&&itblN.children[0]?this.evalExpr(itblN.children[0],env):[];if(Array.isArray(itVal)){for(const item of itVal){this.guard();env[iterN.value]=item;if(bodyN){const r=this.execStmt(bodyN,env);if(r){if(r._break)break;if(r._ret!==undefined)return r;}}}}return null;}if(initN)for(const c of initN.children)this.execStmt(c,env);while(true){this.guard();if(condN&&condN.children[0]){const cv=this.evalExpr(condN.children[0],env);if(!this.truthy(cv))break;}if(bodyN){const r=this.execStmt(bodyN,env);if(r){if(r._break)break;if(r._ret!==undefined)return r;}}if(updN&&updN.children[0])this.evalExpr(updN.children[0],env);}return null;}
+execSwitch(n,env){const exN=n.children.find(c=>c.type==='SWITCH_EXPR');const sv=exN&&exN.children[0]?this.evalExpr(exN.children[0],env):0;const cases=n.children.filter(c=>c.type==='CASE'||c.type==='DEFAULT');let matched=false;for(const cs of cases){if(!matched&&cs.type==='CASE'&&cs.children[0]){const cv=this.evalExpr(cs.children[0],env);if(cv===sv)matched=true;}if(!matched&&cs.type==='DEFAULT')matched=true;if(matched){const stmts=cs.children.filter(c=>!['INT','ID','STRING','FLOAT'].includes(c.type));for(const s of stmts){const r=this.execStmt(s,env);if(r){if(r._break)return null;if(r._ret!==undefined)return r;}}}}return null;}
+truthy(v){return v!==0&&v!==false&&v!==null&&v!==undefined&&v!==''&&v!=='None'&&v!=='False';}
+evalExpr(n,env){if(!n)return 0;switch(n.type){case'INT':return parseInt(n.value);case'FLOAT':return parseFloat(n.value);case'STRING':{let s=n.value;if((s[0]==='"'&&s[s.length-1]==='"')||(s[0]=="'"&&s[s.length-1]=="'"))s=s.slice(1,-1);return s.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\\\/g,'\\');}case'BOOL':return n.value==='True'||n.value==='true';case'NONE':return null;case'ID':{if(n.value in env)return env[n.value];return n.value;}case'ASSIGN':{const lhs=n.children[0],rhs=n.children[1]?this.evalExpr(n.children[1],env):0;const name=lhs?lhs.value:null;if(!name)return rhs;if(n.value==='=')env[name]=rhs;else if(n.value==='+=')env[name]=(env[name]||0)+rhs;else if(n.value==='-=')env[name]=(env[name]||0)-rhs;else if(n.value==='*=')env[name]=(env[name]||0)*rhs;else if(n.value==='/=')env[name]=rhs!==0?(env[name]||0)/rhs:0;return env[name];}case'BIN_OP':{const l=this.evalExpr(n.children[0],env),r=this.evalExpr(n.children[1],env);if(n.value==='+'&&(typeof l==='string'||typeof r==='string'))return String(l)+String(r);switch(n.value){case'+':return l+r;case'-':return l-r;case'*':return l*r;case'/':return r!==0?Math.trunc(l/r):0;case'%':return r!==0?l%r:0;case'//':return r!==0?Math.floor(l/r):0;case'**':return Math.pow(l,r);}return 0;}case'RELATIONAL':{const l=this.evalExpr(n.children[0],env),r=this.evalExpr(n.children[1],env);switch(n.value){case'<':return l<r?1:0;case'>':return l>r?1:0;case'<=':return l<=r?1:0;case'>=':return l>=r?1:0;}return 0;}case'EQUALITY':{const l=this.evalExpr(n.children[0],env),r=this.evalExpr(n.children[1],env);return n.value==='=='?(l===r?1:0):(l!==r?1:0);}case'LOG_AND':{const l=this.evalExpr(n.children[0],env);if(!this.truthy(l))return 0;return this.evalExpr(n.children[1],env);}case'LOG_OR':{const l=this.evalExpr(n.children[0],env);if(this.truthy(l))return l;return this.evalExpr(n.children[1],env);}case'UNARY':{const o=this.evalExpr(n.children[0],env);if(n.value==='-')return-o;if(n.value==='!')return o?0:1;if(n.value==='not')return this.truthy(o)?0:1;return o;}case'PREFIX':{const name=n.children[0]?n.children[0].value:null;if(!name)return 0;const cur=env[name]||0;env[name]=n.value==='++'?cur+1:cur-1;return env[name];}case'POSTFIX':{const name=n.children[0]?n.children[0].value:null;if(!name)return 0;const cur=env[name]||0;env[name]=n.value==='++'?cur+1:cur-1;return cur;}case'CALL':{const fn=n.children[0]?n.children[0].value:'';const argsN=n.children[1];const args=argsN?argsN.children.map(a=>this.evalExpr(a,env)):[];if(fn==='printf'||fn==='print'){let msg=args.length?String(args[0]):'';if(args.length>1){let idx=1;msg=msg.replace(/%[dif]/g,()=>idx<args.length?args[idx++]:'?');msg=msg.replace(/%s/g,()=>idx<args.length?args[idx++]:'?');}this.output.push({text:msg,cls:'output'});return 0;}if(fn==='input'){this.output.push({text:`> ${args[0]||'input'}`,cls:'info'});return'user_input';}if(fn==='len')return Array.isArray(args[0])?args[0].length:0;if(fn==='range'){const start=args.length>=2?args[0]:0,end=args.length>=2?args[1]:args[0]||0;const arr=[];for(let i=start;i<end;i++)arr.push(i);return arr;}if(this.funcs[fn]){const funcNode=this.funcs[fn];const params=funcNode.children.find(c=>c.type==='PARAMETERS');const localEnv={...env};if(params){params.children.forEach((p,i)=>{const pName=p.value||(p.children.find(c=>c.type==='NAME')||{}).value;if(pName)localEnv[pName]=i<args.length?args[i]:0;const def=p.children.find(c=>c.type==='DEFAULT');if(def&&def.children[0]&&localEnv[pName]===undefined)localEnv[pName]=this.evalExpr(def.children[0],env);});}const body=funcNode.children.find(c=>c.type==='BLOCK');if(body){const r=this.execBlock(body,localEnv);if(r&&r._ret!==undefined)return r._ret;}return 0;}this.output.push({text:`NameError: function '${fn}' is not defined`,cls:'error'});return 0;}case'INDEX':{const arr=this.evalExpr(n.children[0],env),idx=this.evalExpr(n.children[1],env);return Array.isArray(arr)?arr[idx]:0;}case'DOT':return `${this.evalExpr(n.children[0],env)}.${n.children[1]?n.children[1].value:'?'}`;case'GROUP':return this.evalExpr(n.children[0],env);case'TERNARY':{const cv=this.evalExpr(n.children[0],env);return this.truthy(cv)?this.evalExpr(n.children[1],env):this.evalExpr(n.children[2],env);}case'LIST':return n.children.map(c=>this.evalExpr(c,env));default:return 0;}}
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function hl(t){let h=esc(t);h=h.replace(/^(L\d+:|func_begin\s+\w+:|func_end\s+\w+)/,`<span style="color:var(--purple)">$1</span>`);h=h.replace(/\b(goto|if)\b/g,`<span style="color:var(--pink)">$1</span>`);h=h.replace(/(;.*)/g,`<span style="color:#6b7280;font-style:italic">$1</span>`);return h;}
+function hlA(t){let h=esc(t);h=h.replace(/(;.*)/g,`<span style="color:#6b7280;font-style:italic">$1</span>`);h=h.replace(/\b(mov|lea|add|sub|imul|idiv|push|pop|call|ret|jmp|jne|cmp|xor|and|or|not|shl|shr|sete|setne|setl|setg|setle|setge)\b/g,`<span style="color:var(--accent)">$1</span>`);return h;}
+function rLines(code,container,highlighter,skip){container.innerHTML='';let n=0;code.forEach(l=>{if(skip&&l.removed)return;if(l.type==='blank'){container.insertAdjacentHTML('beforeend','<div class="cl"><div class="cn"></div><div class="cc">&nbsp;</div></div>');return;}const ln=++n;container.insertAdjacentHTML('beforeend',`<div class="cl"><div class="cn">${ln}</div><div class="cc">${highlighter(l.text)}</div></div>`);});if(n===0)container.innerHTML='<div class="empty" style="padding:20px">No instructions.</div>';}
+function rTokens(tokens){const tb=document.getElementById('tok-tb'),sm=document.getElementById('tok-sum');tb.innerHTML='';sm.innerHTML='';const f=tokens.filter(t=>t.type!=='NEWLINE'&&t.type!=='COMMENT');f.forEach((t,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td><span class="badge ${t.type}">${t.type}</span></td><td class="val">${esc(t.value)}</td><td>${t.line}</td><td>${t.column}</td>`;tb.appendChild(tr);});if(!f.length)tb.innerHTML='<tr><td colspan="5" class="empty">No tokens.</td></tr>';const counts={};f.forEach(t=>{counts[t.type]=(counts[t.type]||0)+1;});Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{const d=document.createElement('div');d.className=`badge ${k}`;d.textContent=`${k}: ${v}`;sm.appendChild(d);});}
+function rAST(node,container){container.innerHTML='';function build(n,indent,isLast,prefix){const div=document.createElement('div');div.className='ast-node';const conn=indent>0?(isLast?'└── ':'├── '):'';div.innerHTML=`${prefix}${conn}<span class="ast-type">${n.type}</span>${n.value!==null?` <span class="ast-value">${esc(n.value)}</span>`:''} <span class="ast-loc">[${n.line}:${n.column}]</span>`;container.appendChild(div);const childPrefix=prefix+(indent>0?(isLast?'    ':'│   '):'');n.children.forEach((ch,i)=>build(ch,indent+1,i===n.children.length-1,childPrefix));}if(node)build(node,0,true,'');}
+function rParseTree(node,container){
+  container.innerHTML='';
+  if(!node){container.innerHTML='<div class="empty">No parse tree.</div>';return;}
+  function branch(n){
+    const wrap=document.createElement('div');
+    wrap.className='ast-node';
+    wrap.innerHTML=`<span class="ast-type">${n.type}</span>${n.value!==null?` <span class="ast-value">${esc(n.value)}</span>`:''} <span class="ast-loc">[${n.line}:${n.column}]</span>`;
+    if(n.children&&n.children.length){
+      const kids=document.createElement('div');kids.className='ast-children';
+      n.children.forEach(ch=>kids.appendChild(branch(ch)));
+      wrap.appendChild(kids);
+    }
+    return wrap;
+  }
+  container.appendChild(branch(node));
+}
+function rSem(sem){const tb=document.getElementById('sym-tb'),wn=document.getElementById('sem-warn');tb.innerHTML='';sem.symbols.forEach(s=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${s.name}</td><td>${s.type}</td><td>${s.scope}</td><td>${s.line}</td>`;tb.appendChild(tr);});if(!sem.symbols.length)tb.innerHTML='<tr><td colspan="4" class="empty">No symbols.</td></tr>';wn.innerHTML='';if(!sem.warnings.length){wn.textContent='No warnings.';return;}sem.warnings.forEach(w=>{const div=document.createElement('div');div.textContent=`⚠️ ${w.msg} (line ${w.line})`;wn.appendChild(div);});}
+function rOpts(opts,c){c.innerHTML='';if(!opts.length){c.innerHTML='<div class="opt-item opt-fold" style="border-color:var(--green)">✅ Already optimal!</div>';return;}const icons={fold:'🔢',prop:'📦',dead:'🗑️',strength:'💪',algebraic:'➗',subexpr:'♻️'};opts.forEach(o=>{const div=document.createElement('div');div.className=`opt-item opt-${o.cls}`;div.innerHTML=`${icons[o.cls]||'⚙️'} ${o.type}: ${o.msg}`;if(o.before)div.innerHTML+=`<div class="diff-before"><div class="diff-label before">before</div><div class="diff-code">${esc(o.before)}</div></div>`;if(o.after)div.innerHTML+=`<div class="diff-after"><div class="diff-label after">after</div><div class="diff-code">${esc(o.after)}</div></div>`;c.appendChild(div);});}
+function rConsole(output,parseErrors){const con=document.getElementById('console');con.innerHTML='';con.insertAdjacentHTML('beforeend','<div class="console-line info">╔════════════ Execution Console ════════════</div>');if(parseErrors.length){parseErrors.forEach(e=>con.insertAdjacentHTML('beforeend',`<div class="console-line error">ParseError (${e.line}:${e.column}): ${esc(e.message)}</div>`));return;}if(!output.length){con.insertAdjacentHTML('beforeend','<div class="console-line info">No output.</div>');return;}output.forEach(o=>con.insertAdjacentHTML('beforeend',`<div class="console-line ${o.cls||'output'}">${o.cls==='output'?'<span class="console-prompt">$</span> ':''}${esc(o.text)}</div>`));}
+function rSummary(d){const st=document.getElementById('sum-stats'),pc=document.getElementById('pipeline-c');const ok=d.parseErrors.length===0;const pct=d.origTAC>0?Math.round((1-d.optTAC/d.origTAC)*100):0;st.innerHTML='';const tiles=[{label:'Tokens',val:d.tokens},{label:'AST Nodes',val:d.astNodes},{label:'Symbols',val:d.symbols},{label:'TAC (orig)',val:d.origTAC},{label:'TAC (opt)',val:d.optTAC},{label:'Asm Instr',val:d.asmInstr},{label:'Output Lines',val:d.outputLines},{label:'Optimizations',val:d.optCount}];tiles.forEach(t=>{st.insertAdjacentHTML('beforeend',`<div class="stat-card"><div class="stat-value">${t.val}</div><div class="stat-label">${t.label}</div></div>`);});const phases=[{n:'1',nm:'Lexical Analysis',d:`${d.tokens} tokens`,co:'var(--accent)'},{n:'2',nm:'Syntax Analysis',d:`${d.astNodes} AST nodes`,co:ok?'var(--green)':'var(--red)'},{n:'3',nm:'Semantic Analysis',d:`${d.symbols} symbols`,co:'var(--accent)'},{n:'4',nm:'ICG',d:`${d.origTAC} TAC lines`,co:'var(--accent)'},{n:'5',nm:'Optimization',d:`${pct}% reduction`,co:'var(--accent2)'},{n:'6',nm:'ASM Generation',d:`${d.asmInstr} instructions`,co:'var(--accent)'},{n:'7',nm:'Execution',d:`${d.outputLines} outputs`,co:'var(--accent)'}];pc.innerHTML='';phases.forEach(p=>{pc.insertAdjacentHTML('beforeend',`<div class="cl" style="border-bottom:1px solid var(--border)"><div class="cn" style="min-width:36px;font-weight:800;color:${p.co}">${p.n}</div><div class="cc"><div style="color:${p.co};font-weight:700">${p.nm}</div><div style="color:var(--muted);font-size:12px">${p.d}</div></div></div>`);});}
+
+/* Tabs */
+document.querySelectorAll('.pbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab=btn.dataset.tab;
+    ['out','p1','p2','p3','p4','p5','p6','p7'].forEach(id=>{
+      document.getElementById(`panel-${id}`).classList.toggle('hidden',id!==tab);
+    });
+  });
+});
+
+/* Run */
+document.getElementById('run').addEventListener('click',()=>{
+  const code=document.getElementById('code').value,status=document.getElementById('status');status.textContent='Compiling…';
+  try{
+    const tokens=tokenize(code);const filtered=tokens.filter(t=>t.type!=='NEWLINE'&&t.type!=='COMMENT');
+    const parser=new Parser(tokens);const ast=parser.parse();
+    const sem=new Sem();const semR=sem.analyze(ast);
+    const tacGen=new TAC();tacGen.generate(ast);const origTAC=[...tacGen.code];
+    const opt=new Opt(tacGen.code);const optR=opt.optimize();
+    const asmGen=new AsmGen();const asmR=asmGen.generate(optR.code);
+    const interp=new Interpreter();let output;try{output=interp.run(ast);}catch(e){output=[{text:e.message,cls:'error'}];}
+    const origTACn=origTAC.filter(c=>c.type!=='blank'&&c.type!=='comment').length;
+    const optTACn=optR.code.filter(c=>!c.removed&&c.type!=='blank'&&c.type!=='comment').length;
+    const asmInstr=asmR.asm.filter(l=>l.type==='instr').length;
+    rTokens(tokens);
+    rAST(ast,document.getElementById('ast-c'));
+    rParseTree(ast,document.getElementById('parse-c'));
+    rSem(semR);
+    rLines(origTAC,document.getElementById('tac-c'),hl,false);
+    rLines(optR.code,document.getElementById('opt-c'),hl,true);
+    rOpts(optR.opts,document.getElementById('opts-c'));
+    rLines(asmR.asm,document.getElementById('asm-c'),hlA,false);
+    rConsole(output,parser.errors);
+    rSummary({tokens:filtered.length,astNodes:ast.count(),parseErrors:parser.errors,symbols:semR.symbols.length,origTAC:origTACn,optTAC:optTACn,optCount:optR.opts.length,asmInstr,outputLines:output.filter(o=>o.cls==='output').length});
+    const outCount=output.filter(o=>o.cls==='output').length;
+    status.textContent=`✅ Compiled & Executed — ${outCount} output line${outCount!==1?'s':''} produced`;
+  }catch(e){status.textContent='Error: '+e.message;console.error(e);}
+});
+
+/* Other controls */
+document.getElementById('clear').addEventListener('click',()=>{
+  document.getElementById('code').value='';
+  document.getElementById('status').textContent='Ready';
+  document.getElementById('console').innerHTML='<div class="console-line info">Cleared.</div>';
+});
+document.getElementById('demo-c').addEventListener('click',()=>{
+  document.getElementById('code').value=`#include <stdio.h>
+
+int factorial(int n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+int main() {
+    int x = 2 + 3;
+    int y = x * 2;
+    float pi = 3.14;
+    int z = x * 1;
+    int w = y + 0;
+
+    printf("=== Compiler Output Demo ===");
+    printf("x = %d", x);
+    printf("y = %d", y);
+    printf("pi = %f", pi);
+    printf("z (x*1) = %d", z);
+    printf("w (y+0) = %d", w);
+
+    int fact5 = factorial(5);
+    printf("factorial(5) = %d", fact5);
+
+    if (x >= 5) {
+        printf("x is >= 5: TRUE");
+    } else {
+        printf("x is >= 5: FALSE");
+    }
+
+    int sum = 0;
+    for (int i = 1; i <= 5; i++) {
+        sum = sum + i;
+    }
+    printf("sum(1..5) = %d", sum);
+
+    int count = 3;
+    while (count > 0) {
+        printf("countdown: %d", count);
+        count--;
+    }
+    printf("Liftoff!");
+
+    switch (x) {
+        case 3:
+            printf("x is 3");
+            break;
+        case 5:
+            printf("x is 5");
+            break;
+        default:
+            printf("x is something else");
+    }
+
+    return 0;
+}`;
+  document.getElementById('run').click();
+});
+document.getElementById('demo-py').addEventListener('click',()=>{
+  document.getElementById('code').value=`# Python Compiler Demo
+def greet(name="World"):
+    print("Hello, " + name + "!")
+
+def fibonacci(n):
+    if n <= 0:
+        return 0
+    if n <= 1:
+        return 1
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+def compute(a, b):
+    x = a + b
+    y = x * 2
+    z = x * 1
+    w = y + 0
+    print("=== Python Compiler Output ===")
+    print("a = " + a)
+    print("b = " + b)
+    print("x = a+b = " + x)
+    print("y = x*2 = " + y)
+    print("z = x*1 (optimized) = " + z)
+    print("w = y+0 (optimized) = " + w)
+
+    if x > 10:
+        print("x > 10: TRUE")
+    elif x > 5:
+        print("x > 5: TRUE")
+    else:
+        print("x <= 5")
+
+    sum = 0
+    for i in range(1, 6):
+        sum = sum + i
+    print("sum(1..5) = " + sum)
+
+    count = 3
+    while count > 0:
+        print("tick: " + count)
+        count = count - 1
+    print("Done!")
+    return x
+
+greet("Compiler")
+greet()
+result = compute(7, 8)
+print("compute returned: " + result)
+
+fib7 = fibonacci(7)
+print("fibonacci(7) = " + fib7)";
+  document.getElementById('run').click();
+});
+</script>
+</body>
+</html>
